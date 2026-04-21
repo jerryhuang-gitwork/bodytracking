@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>型男 Jerry 體態進化追蹤系統 V7.5</title>
+    <!-- 使用 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 使用 Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        body { 
+            font-family: 'Inter', 'Noto Sans TC', sans-serif; 
+            background-color: #f8fafc; 
+            color: #1e293b;
+        }
+
+        .card { 
+            background: white; 
+            border-radius: 2.5rem; 
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); 
+            border: 1px solid #f1f5f9; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+
+        .calendar-day { 
+            height: 100px;
+            transition: all 0.3s; 
+            border-radius: 1.8rem; 
+            border: 1px solid #f1f5f9; 
+            background: white;
+            cursor: pointer;
+        }
+
+        .calendar-day:hover:not(.inactive) {
+            border-color: #6366f1;
+            transform: translateY(-2px);
+        }
+
+        .calendar-day.active { 
+            background: #6366f1; 
+            color: white; 
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.3);
+            border-color: transparent;
+            z-index: 10;
+        }
+
+        .calendar-day.inactive { 
+            opacity: 0.2; 
+            cursor: default; 
+            background: #f1f5f9;
+        }
+
+        .progress-bar-inner { transition: width 1s ease-in-out; }
+        
+        /* 隱藏滾動條但保持功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .tag-train { background-color: #eef2ff; color: #6366f1; }
+        .tag-rest { background-color: #ecfdf5; color: #10b981; }
+        .active .tag-train, .active .tag-rest { background-color: rgba(255,255,255,0.2); color: white; }
+    </style>
+</head>
+<body class="p-4 lg:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center bg-slate-900 text-white p-6 rounded-[2.5rem] shadow-2xl border-b-4 border-indigo-500 gap-6">
+            <div class="flex items-center gap-5">
+                <div class="bg-indigo-600 p-4 rounded-[1.8rem] shadow-xl relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    <div class="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full animate-ping"></div>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-black tracking-tighter uppercase italic">
+                        JERRY <span class="text-indigo-400">PHYS-X</span> V7.5
+                    </h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded-full font-bold text-emerald-400 uppercase tracking-widest">Phase 2: Lean Bulk</span>
+                        <span id="currentDateTitle" class="text-[10px] text-slate-400 font-bold italic underline decoration-indigo-500">Active Day: 2026.04.18</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-6 md:gap-10 px-4">
+                <div class="text-center">
+                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">InBody Score</p>
+                    <p class="text-2xl font-black italic">83</p>
+                </div>
+                <div class="h-10 w-px bg-slate-700"></div>
+                <div class="text-center">
+                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Muscle SMM</p>
+                    <p class="text-2xl font-black text-indigo-400 italic">33.3kg</p>
+                </div>
+                <div class="h-10 w-px bg-slate-700"></div>
+                <div class="text-center">
+                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">BF %</p>
+                    <p class="text-2xl font-black text-rose-500 italic">15.0%</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Top Dashboard Panels -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Daily Performance Card -->
+            <div class="card p-8 flex flex-col justify-between relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-6 opacity-5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="text-xl font-black text-slate-900 italic uppercase tracking-tight">Performance</h3>
+                        <div id="modeBadge" class="px-3 py-1 rounded-lg text-[9px] font-black uppercase bg-indigo-600 text-white">TRAIN MODE</div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-y-12 text-center">
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Total Energy</p>
+                            <p id="mainCals" class="text-4xl font-black text-slate-900 italic">0</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Goal Reach</p>
+                            <p id="mainProgress" class="text-4xl font-black text-indigo-600 italic">0%</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-14 space-y-4">
+                    <div class="flex justify-between items-end">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Efficiency Indicator</span>
+                        <span id="mainTarget" class="text-[10px] font-black text-indigo-500 italic">Target: 2850</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-4 rounded-full overflow-hidden p-1 shadow-inner text-white">
+                        <div id="mainProgressBar" class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-indigo-700 progress-bar-inner" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Macros Chart & Bars -->
+            <div class="md:col-span-2 card p-8 flex flex-col md:flex-row items-center gap-12">
+                <div class="relative w-52 h-52 shrink-0">
+                    <canvas id="macroChart"></canvas>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Nutrition</span>
+                        <span id="bulkStatus" class="text-2xl font-black text-slate-900 italic uppercase">LEAN BULK</span>
+                    </div>
+                </div>
+                <div id="macroBarsContainer" class="flex-1 w-full space-y-6">
+                    <!-- 這裡會由 JS 動態填入宏觀營養素進度條 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Lower Section: History & Calendar -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Logs Detail -->
+            <div class="lg:col-span-1 flex flex-col">
+                <div class="card h-full flex flex-col overflow-hidden border-indigo-100 min-h-[600px]">
+                    <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
+                        <div id="logTitle" class="flex items-center gap-3 italic font-black uppercase tracking-widest text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path></svg>
+                            Log Details
+                        </div>
+                        <div id="logVolTag" class="text-[10px] font-black text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-xl">0t</div>
+                    </div>
+                    <div class="p-7 space-y-8 flex-grow overflow-y-auto no-scrollbar">
+                        <div class="space-y-4">
+                            <h5 class="text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em] underline decoration-indigo-200 decoration-2">🍴 Intake Path</h5>
+                            <ul id="dietList" class="space-y-4 text-sm text-slate-600 font-bold italic leading-relaxed">
+                                <!-- 動態生成列表 -->
+                            </ul>
+                        </div>
+                        <div class="p-6 bg-indigo-950 rounded-[3rem] text-indigo-50 shadow-2xl relative overflow-hidden border border-white/10 mt-auto">
+                            <h5 class="text-[10px] font-black text-indigo-400 uppercase mb-3 tracking-widest italic flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                AI Coach Analysis
+                            </h5>
+                            <p id="coachTip" class="text-xs italic leading-relaxed">數據讀取中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Evolution Timeline (Calendar) -->
+            <div class="lg:col-span-2 card p-8 border-2 border-slate-100">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-900 tracking-tighter uppercase italic underline decoration-indigo-200 decoration-4 underline-offset-8">
+                            Evolution <span class="text-indigo-600">Timeline</span>
+                        </h3>
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-3 italic">April 2026 Archive</p>
+                    </div>
+                    <div class="flex gap-10">
+                        <div class="text-center">
+                            <p class="text-[9px] font-black text-slate-400 uppercase italic mb-1">Total Monthly Vol</p>
+                            <p class="text-xl font-black text-indigo-600 italic">120.5t</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-[9px] font-black text-slate-400 uppercase italic mb-1">Target BF</p>
+                            <p class="text-xl font-black text-rose-500 italic">14%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="calendarGrid" class="grid grid-cols-7 gap-4 text-center">
+                    <!-- 動態生成日曆 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 目標數據
+        const GOALS = {
+            train: { cals: 2850, protein: 165, carbs: 380, fat: 75 },
+            rest: { cals: 2450, protein: 165, carbs: 280, fat: 75 }
+        };
+
+        // 歷史資料庫 (已整合 Jerry 校準後的數據)
+        const ARCHIVE = {
+            "2026-04-12": {
+                type: "train", part: "背肩", vol: "11.4t", cals: 2543, protein: 127, carbs: 305, fat: 87,
+                diet: ["早: 奶茶 + 炸蘿蔔糕加蛋 + 鮪魚蛋餅", "午: 高麗菜飯 + 排骨肉 + 雞胸肉 + 蛋 + 白吐司", "晚: 歐姆蛋牛肉咖哩飯 + 燕麥穀奶", "絕殺: 50g 高蛋白 + 50g 燕麥"],
+                tip: "深夜高蛋白救援成功，完美守住 11.4 噸的背部訓練成果。碳水回填非常紮實。"
+            },
+            "2026-04-13": {
+                type: "rest", part: "休息", vol: "0t", cals: 1392, protein: 54, carbs: 199, fat: 43,
+                diet: ["補給: 7-11 魚卵飯糰", "補給: 7-11 炭火燒肉握便當", "正餐: 蜜汁烤大雞腿健康餐盒"],
+                tip: "休息日回填肝醣中。外食陷阱在於蛋白質密度較低，請務必注意純淨肉類補充。"
+            },
+            "2026-04-14": {
+                type: "train", part: "胸背", vol: "待定", cals: 500, protein: 43, carbs: 65, fat: 9,
+                diet: ["午: 義式香草雞胸健康餐盒 (約150g雞胸/半蛋/地瓜/藜麥飯)"],
+                tip: "午餐數據完美，低脂高蛋白。但因後續數據遺失，全日目標未達成。"
+            },
+            "2026-04-15": {
+                type: "train", part: "腿部", vol: "待定", cals: 780, protein: 32, carbs: 68, fat: 38,
+                diet: ["午: 控肉滷豆乾健康餐盒 (含地瓜/半蛋/高麗菜)"],
+                tip: "五花肉脂質極高，光這一餐就吃掉了一半的脂肪額度。晚餐需採取低脂戰略。"
+            },
+            "2026-04-18": {
+                type: "train", part: "胸肩", vol: "11.4t", cals: 2520, protein: 148, carbs: 293, fat: 87,
+                diet: [
+                    "早: 2片白吐司 + 純鮪魚肉(無美乃滋) + 1片起司",
+                    "午: 日式牛肉丼飯定食 (含茶碗蒸/味噌湯/甜點)",
+                    "訓後: 46g 超大份高蛋白飲",
+                    "晚: 巨無霸雙拼丼飯 (厚切炸豬排+唐揚雞+藜麥飯)",
+                    "宵夜: 2根香蕉 (純粹肝醣回填)"
+                ],
+                tip: "Jerry！無美乃滋細節已校準！移除隱藏油脂後，你的熱量與宏量比例更加精準。11.4 噸轟炸後搭配 148g 蛋白質，肌肉正處於狂暴合成期！"
+            }
+        };
+
+        let activeDate = "2026-04-18";
+        let macroChartInstance = null;
+
+        /**
+         * 更新儀表板數據與圖表
+         */
+        function updateDashboard(date) {
+            activeDate = date;
+            const data = ARCHIVE[date] || { type: 'rest', part: '休', vol: '0t', cals: 0, protein: 0, carbs: 0, fat: 0, diet: [], tip: "等待輸入當日飲食紀錄..." };
+            const target = GOALS[data.type];
+
+            // 標題與標籤
+            document.getElementById('currentDateTitle').innerText = `Active Day: ${date.replace(/-/g, '.')}`;
+            document.getElementById('modeBadge').innerText = data.type === 'train' ? 'TRAINING MODE' : 'REST MODE';
+            document.getElementById('modeBadge').className = `px-3 py-1 rounded-lg text-[9px] font-black uppercase ${data.type === 'train' ? 'bg-indigo-600 text-white' : 'bg-emerald-100 text-emerald-700'}`;
+            
+            // 熱量數據
+            document.getElementById('mainCals').innerText = data.cals;
+            const progress = target.cals > 0 ? Math.min(100, Math.round((data.cals / target.cals) * 100)) : 0;
+            document.getElementById('mainProgress').innerText = progress + '%';
+            document.getElementById('mainTarget').innerText = `Target: ${target.cals} kcal`;
+            document.getElementById('mainProgressBar').style.width = progress + '%';
+
+            // 飲食日誌
+            document.getElementById('logVolTag').innerText = data.vol !== '0t' ? data.vol : 'REST';
+            const dietHtml = data.diet.length > 0 
+                ? data.diet.map(item => `
+                    <li class="flex gap-4 border-l-4 border-indigo-100 pl-4 py-1 hover:bg-slate-50 transition-all rounded-r-xl">
+                        <span class="text-indigo-300">#</span> ${item}
+                    </li>`).join('')
+                : '<p class="text-slate-400 italic">尚無資料</p>';
+            document.getElementById('dietList').innerHTML = dietHtml;
+            document.getElementById('coachTip').innerText = data.tip;
+
+            // 圖表渲染
+            const carbsCal = data.carbs * 4;
+            const protCal = data.protein * 4;
+            const fatCal = data.fat * 9;
+            const chartDataValues = (carbsCal + protCal + fatCal) === 0 ? [1,1,1] : [carbsCal, protCal, fatCal];
+            const chartColors = (carbsCal + protCal + fatCal) === 0 ? ['#f1f5f9','#f1f5f9','#f1f5f9'] : ['#6366f1', '#10b981', '#f59e0b'];
+
+            if (macroChartInstance) macroChartInstance.destroy();
+            const ctx = document.getElementById('macroChart').getContext('2d');
+            macroChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: chartDataValues,
+                        backgroundColor: chartColors,
+                        borderWidth: 0,
+                        cutout: '82%'
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false }, tooltip: { enabled: (carbsCal+protCal+fatCal) > 0 } } 
+                }
+            });
+
+            // 宏觀營養素進度條
+            const macros = [
+                { label: '碳水化合物 (Carbs)', val: data.carbs, goal: target.carbs, color: '#6366f1' },
+                { label: '蛋白質攝取 (Protein)', val: data.protein, goal: target.protein, color: '#10b981' },
+                { label: '脂肪控制量 (Fat)', val: data.fat, goal: target.fat, color: '#f59e0b' }
+            ];
+            
+            document.getElementById('macroBarsContainer').innerHTML = macros.map(m => {
+                const percent = m.goal > 0 ? Math.min(100, (m.val / m.goal) * 100) : 0;
+                const isProteinWarning = m.label.includes('Protein') && m.val < 120 && data.cals > 1500;
+                return `
+                <div class="space-y-2">
+                    <div class="flex justify-between items-baseline">
+                        <span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">${m.label}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg font-black italic ${isProteinWarning ? 'text-rose-500 animate-pulse' : 'text-slate-900'}">
+                                ${Math.round(m.val)}g
+                            </span>
+                            <span class="text-[10px] font-bold text-slate-300 uppercase italic">/ ${m.goal}g</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                        <div class="h-full progress-bar-inner shadow-sm" style="width: ${percent}%; background-color: ${m.color}"></div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            renderCalendar();
+        }
+
+        /**
+         * 渲染日曆組件
+         */
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            // 星期頭
+            ['SUN','MON','TUE','WED','THU','FRI','SAT'].forEach(day => {
+                const el = document.createElement('div');
+                el.className = 'text-[11px] font-black text-slate-300 uppercase italic mb-4';
+                el.innerText = day;
+                grid.appendChild(el);
+            });
+
+            // 2026年4月1日是星期三 (對應索引 3)
+            for(let i=0; i<3; i++) {
+                grid.appendChild(document.createElement('div'));
+            }
+
+            // 生成 30 天
+            for(let d=1; d<=30; d++) {
+                const dateStr = `2026-04-${d.toString().padStart(2, '0')}`;
+                const dayData = ARCHIVE[dateStr];
+                const isActive = activeDate === dateStr;
+
+                const dayEl = document.createElement('div');
+                dayEl.className = `calendar-day p-2 flex flex-col items-center justify-between group ${isActive ? 'active' : ''} ${!dayData ? 'inactive' : ''}`;
+                
+                dayEl.onclick = () => {
+                    if(dayData) updateDashboard(dateStr);
+                };
+                
+                dayEl.innerHTML = `
+                    <span class="text-[10px] font-black self-start">${d}</span>
+                    ${dayData ? `
+                        <div class="w-full text-center space-y-1">
+                            <div class="text-[9px] font-black uppercase truncate px-2 py-0.5 rounded-xl tag-${dayData.type}">
+                                ${dayData.part}
+                            </div>
+                            <div class="text-[8px] font-mono font-bold ${isActive ? 'text-white' : 'text-slate-400'}">
+                                ${dayData.vol !== '0t' ? dayData.vol : 'REST'}
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+                grid.appendChild(dayEl);
+            }
+        }
+
+        // 頁面加載完成後初始化
+        window.onload = () => updateDashboard("2026-04-18");
+    </script>
+</body>
+</html>
